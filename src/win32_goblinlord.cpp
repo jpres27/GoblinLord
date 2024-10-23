@@ -150,7 +150,7 @@ internal void process_keyboard_event(Game_Button_State *new_state, b32 is_down)
     }
 }
 
-internal void process_pending_messages(Game_Input *input)
+internal void process_pending_messages(Game_Controller_Input *input)
 {
     MSG message;
     while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
@@ -168,11 +168,11 @@ internal void process_pending_messages(Game_Input *input)
         } break;
         case WM_LBUTTONDOWN:
         {
-            process_keyboard_event(&input->keyboard.attack, true);
+            process_keyboard_event(&input->attack, true);
         } break;
         case WM_RBUTTONDOWN:
         {
-            process_keyboard_event(&input->keyboard.block, true);
+            process_keyboard_event(&input->block, true);
         } break;
         case WM_SYSKEYDOWN:
         case WM_SYSKEYUP:
@@ -189,35 +189,35 @@ internal void process_pending_messages(Game_Input *input)
             {
                 if(vk_code == 'W')
                 {
-                    process_keyboard_event(&input->keyboard.move_fwd, is_down);
+                    process_keyboard_event(&input->move_fwd, is_down);
                 }
                 else if(vk_code == 'A')
                 {
-                    process_keyboard_event(&input->keyboard.move_left, is_down);
+                    process_keyboard_event(&input->move_left, is_down);
                 }
                 else if(vk_code == 'S')
                 {
-                    process_keyboard_event(&input->keyboard.move_back, is_down);
+                    process_keyboard_event(&input->move_back, is_down);
                 }
                 else if(vk_code == 'D')
                 {
-                    process_keyboard_event(&input->keyboard.move_right, is_down);
+                    process_keyboard_event(&input->move_right, is_down);
                 }
                 else if(vk_code == 'F')
                 {
-                    process_keyboard_event(&input->keyboard.inventory, is_down);
+                    process_keyboard_event(&input->inventory, is_down);
                 }
                 else if(vk_code == 'J')
                 {
-                    process_keyboard_event(&input->keyboard.inventory, is_down);
+                    process_keyboard_event(&input->inventory, is_down);
                 }
                 else if(vk_code == 'E')
                 {
-                    process_keyboard_event(&input->keyboard.use, is_down);
+                    process_keyboard_event(&input->use, is_down);
                 }
                 else if(vk_code == VK_SPACE)
                 {
-                    process_keyboard_event(&input->keyboard.jump, is_down);
+                    process_keyboard_event(&input->jump, is_down);
                 }
 
                 if(is_down)
@@ -248,16 +248,19 @@ internal void process_pending_messages(Game_Input *input)
 
 LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    LRESULT result = 0;
     switch( msg )
     {
         case WM_SIZE:
         {
         } break;
+
         case WM_DESTROY:
         {
             // TODO: Handle with error message to user?
             running = false;
         } break;
+
         case WM_SYSKEYDOWN:
         case WM_SYSKEYUP:
         case WM_KEYDOWN:
@@ -265,12 +268,31 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
         {
             assert(!"Keyboard input came in through a non-dispatch message!");
         } break;
+
         case WM_CLOSE:
         {
             // TODO: Are you sure you want to close popup?
             running = false;
         } break;
-            case WM_PAINT:
+
+        case WM_SETCURSOR: 
+        {
+            result = DefWindowProc(window, msg, wParam, lParam);
+        } break;
+
+        case WM_ACTIVATEAPP: 
+        {
+            if(wParam == TRUE)
+            {
+                SetLayeredWindowAttributes(window, RGB(0, 0, 0), 255, LWA_ALPHA);
+            }
+            else 
+            {
+                SetLayeredWindowAttributes(window, RGB(0, 0, 0), 64, LWA_ALPHA);
+            }
+        } break;
+
+        case WM_PAINT:
         {
             PAINTSTRUCT paint;
             HDC device_context = BeginPaint(window, &paint);
@@ -283,11 +305,13 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
                                         dimensions.width, dimensions.height, x, y, width, height);
             EndPaint(window, &paint);
         } break;
-        return DefWindowProc(window,
-            msg,
-            wParam,
-            lParam);
+
+        default:
+        {
+            result = DefWindowProc(window, msg, wParam, lParam);
+        } break;
     }
+    return(result);
 }
 
 void messageloop(HWND window)
@@ -337,6 +361,9 @@ int WINAPI WinMain(HINSTANCE instance,
     b32 scheduler_granularity_set = (timeBeginPeriod(desired_scheduler_milliseconds) == TIMERR_NOERROR);
 
     WNDCLASS window_class = {};
+
+    win32_resize_DIB_section(&global_backbuffer, 960, 540);
+
     window_class.style = CS_HREDRAW | CS_VREDRAW;
     window_class.lpfnWndProc = win32_main_window_callback;
     window_class.hInstance = instance;
@@ -400,9 +427,8 @@ int WINAPI WinMain(HINSTANCE instance,
 
             running = true;
 
-            Game_Input game_input[2] = {};
-            Game_Input *new_input = &game_input[0];
-            Game_Input *old_input = &game_input[1];
+            Game_Controller_Input new_input = {};
+            Game_Controller_Input old_input = {};
 
             LARGE_INTEGER last_counter = win32_get_wall_clock();
             LARGE_INTEGER flip_wall_clock = win32_get_wall_clock();
@@ -411,35 +437,33 @@ int WINAPI WinMain(HINSTANCE instance,
 
             while(running)
             {
-                new_input->dt_for_frame = target_seconds_per_frame;
+                new_input.dt_for_frame = target_seconds_per_frame;
 
-                Game_Controller_Input *old_keyboard = &old_input->keyboard;
-                Game_Controller_Input *new_keyboard = &new_input->keyboard;
-                new_keyboard = {};
+                new_input = {};
 
                 for(int button_index = 0; 
-                    button_index < array_count(new_input->keyboard.buttons); 
+                    button_index < array_count(new_input.buttons); 
                     ++button_index)
                 {
-                    new_keyboard->buttons[button_index].ended_down =
-                    old_keyboard->buttons[button_index].ended_down;
+                    new_input.buttons[button_index].ended_down =
+                    old_input.buttons[button_index].ended_down;
                 }
-                process_pending_messages(new_input);
+                process_pending_messages(&new_input);
 
                 vec2 dd_player = {};
-                if(new_input->keyboard.move_left.ended_down)
+                if(new_input.move_left.ended_down)
                 {
                     dd_player.x = -1.0f;
                 }
-                if(new_input->keyboard.move_right.ended_down)
+                if(new_input.move_right.ended_down)
                 {
                     dd_player.x = 1.0f;
                 }
-                if(new_input->keyboard.move_fwd.ended_down)
+                if(new_input.move_fwd.ended_down)
                 {
                     dd_player.y = 1.0f;
                 }
-                if(new_input->keyboard.move_back.ended_down)
+                if(new_input.move_back.ended_down)
                 {
                     dd_player.y = -1.0f;
                 }
@@ -563,7 +587,7 @@ int WINAPI WinMain(HINSTANCE instance,
 
                 flip_wall_clock = win32_get_wall_clock();
                 
-                Game_Input *temp = new_input;
+                Game_Controller_Input temp = new_input;
                 new_input = old_input;
                 old_input = temp;
 

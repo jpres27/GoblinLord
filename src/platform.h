@@ -66,6 +66,8 @@ struct Game_Button_State
 struct Game_Controller_Input
 {
     b32 is_connected;
+    Game_Button_State mouse_buttons[2];
+    i32 mouse_x, mouse_y, mouse_z;
 
     union 
     {
@@ -88,13 +90,6 @@ struct Game_Controller_Input
             Game_Button_State terminator;
         };
     };
-};
-
-struct Game_Input 
-{
-    Game_Button_State mouse_buttons[2];
-    i32 mouse_x, mouse_y, mouse_z;
-    Game_Controller_Input keyboard;
     r32 dt_for_frame;
 };
 
