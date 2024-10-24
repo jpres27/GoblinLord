@@ -15,13 +15,14 @@
 
 global_variable b32 running = false;
 global_variable WINDOWPLACEMENT prev_window_position = {sizeof(prev_window_position)};
-global_variable u32 WIDTH = 1280;
-global_variable u32 HEIGHT = 960;
+global_variable u32 GAME_WIDTH = 640;
+global_variable u32 GAME_HEIGHT = 480;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
 #include "win32_wasapi.h"
 #include "sound.cpp"
+#include "goblinlord.cpp"
 
 global_variable WasapiAudio audio;
 
@@ -76,69 +77,11 @@ internal Win32_Window_Dimensions get_window_dimensions(HWND window)
 internal void win32_resize_DIB_section(Win32_Buffer *buffer, int width, int height)
 {
 
-    // TODO: Bulletproof this.
-    // Maybe don't free first, free after, then free first if that fails.
-
-    int bpp = 4;
-
-    if (buffer->memory)
-    {
-        VirtualFree(buffer->memory, 0, MEM_RELEASE);
-    }
-
-    buffer->width = width;
-    buffer->height = height;
-
-    // NOTE: When the biHeight field is negative, Windows treats this bitmap as top-down
-    // so that the first three bytes of the image are the color for the top-left pixel
-    // in the bitmap.
-    buffer->Info.bmiHeader.biSize = sizeof(buffer->Info.bmiHeader);
-    buffer->Info.bmiHeader.biWidth = buffer->width;
-    buffer->Info.bmiHeader.biHeight = -buffer->height;
-    buffer->Info.bmiHeader.biPlanes = 1;
-    buffer->Info.bmiHeader.biBitCount = 32;
-    buffer->Info.bmiHeader.biCompression = BI_RGB;
-
-    size_t bitmap_memory_size = (buffer->width * buffer->height) * bpp;
-    buffer->memory = VirtualAlloc(0, bitmap_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-
-    buffer->pitch = width * bpp;
-    buffer->bpp = bpp;
-
-    // TODO: Probably clear this to black
 }
 
 internal void win32_copy_buffer_to_window(Win32_Buffer *buffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height)
 {
-    if((window_width >= buffer->width*2) && (window_height >= buffer->height*2))
-    {
-        StretchDIBits(device_context,
-            0, 0, 2*buffer->width, 2*buffer->height,
-            0, 0, buffer->width, buffer->height,
-            buffer->memory,
-            &buffer->Info,
-            DIB_RGB_COLORS,
-            SRCCOPY);
-    }
-    else
-    {
-        int offset_x = 10;
-        int offset_y = 10;
-        
-        PatBlt(device_context, 0, 0, window_width, offset_y, BLACKNESS);
-        PatBlt(device_context, 0, offset_y + buffer->height, window_width, window_height, BLACKNESS);
-        PatBlt(device_context, 0, 0, offset_x, window_height, BLACKNESS);
-        PatBlt(device_context, offset_x + buffer->width, 0, window_width, window_height, BLACKNESS);
 
-        // NOTE: During prototyping, we will always blit 1:1 pixels for learning to code a renderer
-        StretchDIBits(device_context,
-                    offset_x, offset_y, buffer->width, buffer->height,
-                    0, 0, buffer->width, buffer->height,
-                    buffer->memory,
-                    &buffer->Info,
-                    DIB_RGB_COLORS,
-                    SRCCOPY);
-    }
 }
 
 internal void process_keyboard_event(Game_Button_State *new_state, b32 is_down)
@@ -362,7 +305,7 @@ int WINAPI WinMain(HINSTANCE instance,
 
     WNDCLASS window_class = {};
 
-    win32_resize_DIB_section(&global_backbuffer, 960, 540);
+    win32_resize_DIB_section(&global_backbuffer, GAME_WIDTH, GAME_HEIGHT);
 
     window_class.style = CS_HREDRAW | CS_VREDRAW;
     window_class.lpfnWndProc = win32_main_window_callback;
@@ -530,14 +473,19 @@ int WINAPI WinMain(HINSTANCE instance,
                     WA_UnlockBuffer(&audio, writeCount);
                 }
 
+                #if 0
                 Game_Offscreen_Buffer buffer = {};
                 buffer.memory = global_backbuffer.memory;
                 buffer.width = global_backbuffer.width;
                 buffer.height = global_backbuffer.height;
                 buffer.pitch = global_backbuffer.pitch;
                 buffer.bpp = global_backbuffer.bpp;
+                #endif
 
-                // Game update and render
+                // TODO: Game update and render
+                // For now lets just figure out writing something to the global_backbuffer
+                // and we can do more later once that is working
+
 
                 LARGE_INTEGER work_counter = win32_get_wall_clock();
                 r32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);
