@@ -20,13 +20,46 @@ global_variable u32 GAME_HEIGHT = 480;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
+global_variable BITMAPINFO BitmapInfo;
+global_variable void *BitmapMemory;
+global_variable int BitmapWidth;
+global_variable int BitmapHeight;
+global_variable int BytesPerPixel = 4;
+
 #include "win32_wasapi.h"
 #include "sound.cpp"
 #include "goblinlord.cpp"
 
 global_variable WasapiAudio audio;
 
-internal void init_arena(Memory_Arena *arena, memory_index size, uint8_t *base)
+internal void
+RenderWeirdGradient(int BlueOffset, int GreenOffset)
+{    
+    int Width = BitmapWidth;
+    int Height = BitmapHeight;
+
+    int Pitch = Width*BytesPerPixel;
+    u8 *Row = (u8 *)BitmapMemory;    
+    for(int Y = 0;
+        Y < BitmapHeight;
+        ++Y)
+    {
+        u32 *Pixel = (u32 *)Row;
+        for(int X = 0;
+            X < BitmapWidth;
+            ++X)
+        {
+            u8 Blue = (X + BlueOffset);
+            u8 Green = (Y + GreenOffset);
+            
+            *Pixel++ = ((Green << 8) | Blue);
+        }
+
+        Row += Pitch;
+    }
+}
+
+internal void init_arena(Memory_Arena *arena, memory_index size, u8 *base)
 {
     arena->size = size;
     arena->base = base;
@@ -74,14 +107,42 @@ internal Win32_Window_Dimensions get_window_dimensions(HWND window)
     return (result);
 }
 
-internal void win32_resize_DIB_section(Win32_Buffer *buffer, int width, int height)
+internal void win32_resize_DIB_section(int Width, int Height)
 {
+    if(BitmapMemory)
+    {
+        VirtualFree(BitmapMemory, 0, MEM_RELEASE);
+    }
 
+    BitmapWidth = Width;
+    BitmapHeight = Height;
+    
+    BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader);
+    BitmapInfo.bmiHeader.biWidth = BitmapWidth;
+    BitmapInfo.bmiHeader.biHeight = -BitmapHeight;
+    BitmapInfo.bmiHeader.biPlanes = 1;
+    BitmapInfo.bmiHeader.biBitCount = 32;
+    BitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+    int BitmapMemorySize = (BitmapWidth*BitmapHeight)*BytesPerPixel;
+    BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
-internal void win32_copy_buffer_to_window(Win32_Buffer *buffer, HDC device_context, int window_width, int window_height, int x, int y, int width, int height)
-{
-
+internal void
+Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width, int Height)
+{    
+    int WindowWidth = ClientRect->right - ClientRect->left;
+    int WindowHeight = ClientRect->bottom - ClientRect->top;
+    StretchDIBits(DeviceContext,
+                  /*
+                  X, Y, Width, Height,
+                  X, Y, Width, Height,
+                  */
+                  0, 0, BitmapWidth, BitmapHeight,
+                  0, 0, WindowWidth, WindowHeight,
+                  BitmapMemory,
+                  &BitmapInfo,
+                  DIB_RGB_COLORS, SRCCOPY);
 }
 
 internal void process_keyboard_event(Game_Button_State *new_state, b32 is_down)
@@ -122,7 +183,7 @@ internal void process_pending_messages(Game_Controller_Input *input)
         case WM_KEYDOWN:
         case WM_KEYUP:
         {
-            uint32_t vk_code = (uint32_t)message.wParam;
+            u32 vk_code = (u32)message.wParam;
             // NOTE: Since we are comparing was_down and is_down directly we need to use
             // == and != to convert them to 0 or 1 values
             b32 was_down = ((message.lParam & KEY_MESSAGE_WAS_DOWN_BIT) != 0);
@@ -196,6 +257,11 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
     {
         case WM_SIZE:
         {
+            RECT ClientRect;
+            GetClientRect(window, &ClientRect);
+            int Width = ClientRect.right - ClientRect.left;
+            int Height = ClientRect.bottom - ClientRect.top;
+            win32_resize_DIB_section(Width, Height);
         } break;
 
         case WM_DESTROY:
@@ -241,11 +307,12 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
             HDC device_context = BeginPaint(window, &paint);
             int x = paint.rcPaint.left;
             int y = paint.rcPaint.right;
-            LONG width = paint.rcPaint.bottom - paint.rcPaint.top;
-            LONG height = paint.rcPaint.right - paint.rcPaint.left;
-            Win32_Window_Dimensions dimensions = get_window_dimensions(window);
-            win32_copy_buffer_to_window(&global_backbuffer, device_context,
-                                        dimensions.width, dimensions.height, x, y, width, height);
+            int width = paint.rcPaint.bottom - paint.rcPaint.top;
+            int height = paint.rcPaint.right - paint.rcPaint.left;
+            RECT ClientRect;
+            GetClientRect(window, &ClientRect);
+
+            Win32UpdateWindow(device_context, &ClientRect, x, y, width, height);
             EndPaint(window, &paint);
         } break;
 
@@ -305,8 +372,6 @@ int WINAPI WinMain(HINSTANCE instance,
 
     WNDCLASS window_class = {};
 
-    win32_resize_DIB_section(&global_backbuffer, GAME_WIDTH, GAME_HEIGHT);
-
     window_class.style = CS_HREDRAW | CS_VREDRAW;
     window_class.lpfnWndProc = win32_main_window_callback;
     window_class.hInstance = instance;
@@ -331,6 +396,10 @@ int WINAPI WinMain(HINSTANCE instance,
 
         if(window) 
         {
+
+            int XOffset = 0;
+            int YOffset = 0;
+
             HDC refresh_dc = GetDC(window);
             int monitor_refresh_hz = 60;
             int win32_refresh_rate = GetDeviceCaps(refresh_dc, VREFRESH);
@@ -350,7 +419,7 @@ int WINAPI WinMain(HINSTANCE instance,
             game_memory.game_memory_block = VirtualAlloc(0, (size_t)game_memory.total_storage_size, 
                                                         MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
             game_memory.permanent_storage = game_memory.game_memory_block;
-            game_memory.transient_storage = ((uint8_t *)game_memory.permanent_storage + 
+            game_memory.transient_storage = ((u8 *)game_memory.permanent_storage + 
                                             game_memory.permanent_storage_size);
 #endif
     
@@ -473,18 +542,22 @@ int WINAPI WinMain(HINSTANCE instance,
                     WA_UnlockBuffer(&audio, writeCount);
                 }
 
-                #if 0
-                Game_Offscreen_Buffer buffer = {};
-                buffer.memory = global_backbuffer.memory;
-                buffer.width = global_backbuffer.width;
-                buffer.height = global_backbuffer.height;
-                buffer.pitch = global_backbuffer.pitch;
-                buffer.bpp = global_backbuffer.bpp;
-                #endif
-
                 // TODO: Game update and render
                 // For now lets just figure out writing something to the global_backbuffer
                 // and we can do more later once that is working
+
+                RenderWeirdGradient(XOffset, YOffset);
+
+                HDC DeviceContext = GetDC(window);
+                RECT ClientRect;
+                GetClientRect(window, &ClientRect);
+                int WindowWidth = ClientRect.right - ClientRect.left;
+                int WindowHeight = ClientRect.bottom - ClientRect.top;
+                Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
+                ReleaseDC(window, DeviceContext);
+                
+                ++XOffset;
+                YOffset += 2;
 
 
                 LARGE_INTEGER work_counter = win32_get_wall_clock();
@@ -525,13 +598,6 @@ int WINAPI WinMain(HINSTANCE instance,
                 LARGE_INTEGER end_counter = win32_get_wall_clock();
                 r32 milliseconds_per_frame = 1000.0f*win32_get_seconds_elapsed(last_counter, end_counter);
                 last_counter = end_counter;
-
-                Win32_Window_Dimensions dimensions = get_window_dimensions(window);
-                HDC device_context = GetDC(window);
-                win32_copy_buffer_to_window(&global_backbuffer, device_context,
-                                            dimensions.width, dimensions.height, 0, 0, 
-                                            dimensions.width, dimensions.height);
-                ReleaseDC(window, device_context);
 
                 flip_wall_clock = win32_get_wall_clock();
                 
