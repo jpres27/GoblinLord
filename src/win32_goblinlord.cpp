@@ -15,8 +15,11 @@
 
 global_variable b32 running = false;
 global_variable WINDOWPLACEMENT prev_window_position = {sizeof(prev_window_position)};
-global_variable u32 GAME_WIDTH = 640;
-global_variable u32 GAME_HEIGHT = 480;
+
+global_variable u32 SCREEN_WIDTH = 854;
+global_variable u32 SCREEN_HEIGHT = 480;
+global_variable u32 GAME_WIDTH = 340;
+global_variable u32 GAME_HEIGHT = 180;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
@@ -32,31 +35,61 @@ global_variable int BytesPerPixel = 4;
 
 global_variable WasapiAudio audio;
 
-internal void
-RenderWeirdGradient(int BlueOffset, int GreenOffset)
+internal void FillScreen(u8 blue, u8 green, u8 red)
 {    
+    /*
+        Pixel in memory: BB GG RR xx
+    */
+
     int Width = BitmapWidth;
     int Height = BitmapHeight;
 
     int Pitch = Width*BytesPerPixel;
     u8 *Row = (u8 *)BitmapMemory;    
-    for(int Y = 0;
-        Y < BitmapHeight;
-        ++Y)
+    for(int Y = 0; Y < BitmapHeight; ++Y)
     {
-        u32 *Pixel = (u32 *)Row;
-        for(int X = 0;
-            X < BitmapWidth;
-            ++X)
+        u8 *Pixel = Row;
+        for(int X = 0; X < BitmapWidth; ++X)
         {
-            u8 Blue = (X + BlueOffset);
-            u8 Green = (Y + GreenOffset);
-            
-            *Pixel++ = ((Green << 8) | Blue);
+            *Pixel = blue;
+            ++Pixel;
+             
+             *Pixel = green;
+             ++Pixel;
+
+            *Pixel = red;
+             ++Pixel;
+
+            *Pixel = 0;
+             ++Pixel;
+            }
         }
 
         Row += Pitch;
-    }
+}
+
+internal void DrawPixel(u32 x, u32 y, u8 blue, u8 green, u8 red)
+{    
+    /*
+        Pixel in memory: BB GG RR xx
+    */
+
+    int Width = BitmapWidth;
+    int Height = BitmapHeight;
+ 
+    u8 *Pixel = (u8 *)BitmapMemory;
+    Pixel += (y*Width+x)*BytesPerPixel;
+    *Pixel = blue;
+    ++Pixel;
+             
+    *Pixel = green;
+    ++Pixel;
+
+    *Pixel = red;
+    ++Pixel;
+    
+    *Pixel = 0;
+    ++Pixel;
 }
 
 internal void init_arena(Memory_Arena *arena, memory_index size, u8 *base)
@@ -128,8 +161,7 @@ internal void win32_resize_DIB_section(int Width, int Height)
     BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
-internal void
-Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width, int Height)
+internal void Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width, int Height)
 {    
     int WindowWidth = ClientRect->right - ClientRect->left;
     int WindowHeight = ClientRect->bottom - ClientRect->top;
@@ -384,11 +416,11 @@ int WINAPI WinMain(HINSTANCE instance,
             0, //WS_EX_TOPMOST|WS_EX_LAYERED,
             window_class.lpszClassName,
             "Goblin Lord",
-            WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+            WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
             0,
             0,
             instance,
@@ -396,10 +428,6 @@ int WINAPI WinMain(HINSTANCE instance,
 
         if(window) 
         {
-
-            int XOffset = 0;
-            int YOffset = 0;
-
             HDC refresh_dc = GetDC(window);
             int monitor_refresh_hz = 60;
             int win32_refresh_rate = GetDeviceCaps(refresh_dc, VREFRESH);
@@ -546,7 +574,8 @@ int WINAPI WinMain(HINSTANCE instance,
                 // For now lets just figure out writing something to the global_backbuffer
                 // and we can do more later once that is working
 
-                RenderWeirdGradient(XOffset, YOffset);
+                FillScreen(255, 255, 255);
+                DrawPixel(BitmapWidth/2, BitmapHeight/2, 255, 0, 0);
 
                 HDC DeviceContext = GetDC(window);
                 RECT ClientRect;
@@ -555,10 +584,6 @@ int WINAPI WinMain(HINSTANCE instance,
                 int WindowHeight = ClientRect.bottom - ClientRect.top;
                 Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
                 ReleaseDC(window, DeviceContext);
-                
-                ++XOffset;
-                YOffset += 2;
-
 
                 LARGE_INTEGER work_counter = win32_get_wall_clock();
                 r32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);
