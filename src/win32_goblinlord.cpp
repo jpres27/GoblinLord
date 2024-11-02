@@ -12,14 +12,16 @@
 #include "goblinlord.h"
 #include "platform.h"
 #include "win32_goblinlord.h"
+#include "goblinlord_math.h"
+#include "goblinlord_intrinsics.h"
 
 global_variable b32 running = false;
 global_variable WINDOWPLACEMENT prev_window_position = {sizeof(prev_window_position)};
 
-global_variable u32 SCREEN_WIDTH = 854;
-global_variable u32 SCREEN_HEIGHT = 480;
-global_variable u32 GAME_WIDTH = 340;
-global_variable u32 GAME_HEIGHT = 180;
+global_variable u32 SCREEN_WIDTH = 1020;
+global_variable u32 SCREEN_HEIGHT = 540;
+global_variable u32 GAME_WIDTH = 960;
+global_variable u32 GAME_HEIGHT = 540;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
@@ -72,25 +74,36 @@ internal void Win32ResizeDIBSection(Win32_Buffer *buffer, int width, int height)
     buffer->pitch = width*bpp;
 }
 
-internal void Win32DisplayBufferInWindow(Win32_Buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight)
+internal void Win32DisplayBufferInWindow(Win32_Buffer *Buffer,
+                           HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
-    int OffsetX = 10;
-    int OffsetY = 10;
+    if((WindowWidth >= Buffer->width*3) &&
+       (WindowHeight >= Buffer->height*3))
+    {
+        StretchDIBits(DeviceContext,
+                      0, 0, 3*Buffer->width, 3*Buffer->height,
+                      0, 0, Buffer->width, Buffer->height,
+                      Buffer->memory,
+                      &Buffer->info,
+                      DIB_RGB_COLORS, SRCCOPY);
+    }
+    else
+    {
+        int OffsetX = 10;
+        int OffsetY = 10;
 
-    PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
-    PatBlt(DeviceContext, 0, OffsetY + Buffer->height, WindowWidth, WindowHeight, BLACKNESS);
-    PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
-    PatBlt(DeviceContext, OffsetX + Buffer->width, 0, WindowWidth, WindowHeight, BLACKNESS);
-    
-    // NOTE(casey): For prototyping purposes, we're going to always blit
-    // 1-to-1 pixels to make sure we don't introduce artifacts with
-    // stretching while we are learning to code the renderer!
-    StretchDIBits(DeviceContext,
-                  OffsetX, OffsetY, Buffer->width, Buffer->height,
-                  0, 0, Buffer->width, Buffer->height,
-                  Buffer->memory,
-                  &Buffer->info,
-                  DIB_RGB_COLORS, SRCCOPY);
+        PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
+        PatBlt(DeviceContext, 0, OffsetY + Buffer->height, WindowWidth, WindowHeight, BLACKNESS);
+        PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+        PatBlt(DeviceContext, OffsetX + Buffer->width, 0, WindowWidth, WindowHeight, BLACKNESS);
+
+        StretchDIBits(DeviceContext,
+                      OffsetX, OffsetY, Buffer->width, Buffer->height,
+                      0, 0, Buffer->width, Buffer->height,
+                      Buffer->memory,
+                      &Buffer->info,
+                      DIB_RGB_COLORS, SRCCOPY);
+    }
 }
 
 internal void process_keyboard_event(Game_Button_State *new_state, b32 is_down)
@@ -386,22 +399,22 @@ int WINAPI WinMain(HINSTANCE instance,
                 }
                 process_pending_messages(&new_input);
 
-                Vec2 dd_player = {};
+                v2 dd_player = {};
                 if(new_input.move_left.ended_down)
                 {
-                    dd_player.x = -1.0f;
+                    dd_player.X = -1.0f;
                 }
                 if(new_input.move_right.ended_down)
                 {
-                    dd_player.x = 1.0f;
+                    dd_player.X = 1.0f;
                 }
                 if(new_input.move_fwd.ended_down)
                 {
-                    dd_player.y = 1.0f;
+                    dd_player.Y = 1.0f;
                 }
                 if(new_input.move_back.ended_down)
                 {
-                    dd_player.y = -1.0f;
+                    dd_player.Y = -1.0f;
                 }
                 // TODO: Mouse movement and button handling
 

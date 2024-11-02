@@ -51,13 +51,3 @@ struct Loaded_Bitmap
     int32_t pixel_height;
     uint32_t *pixels;
 };
-
-struct Vec2
-{
-    r32 x, y;
-};
-
-struct Vec3 
-{
-    r32 x, y, z;
-};

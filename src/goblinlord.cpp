@@ -1,57 +1,74 @@
-internal void FillScreen(Game_Offscreen_Buffer *buffer, u8 blue, u8 green, u8 red)
-{    
-    /*
-        Pixel in memory: BB GG RR xx
-    */
+internal void DrawRectangle(Game_Offscreen_Buffer *buffer, v2 v_min, v2 v_max, r32 red, r32 green, r32 blue)
+{        
+	i32 min_x = RoundReal32ToInt32(v_min.X);
+    i32 min_y = RoundReal32ToInt32(v_min.Y);
+    i32 max_x = RoundReal32ToInt32(v_max.X);
+    i32 max_y = RoundReal32ToInt32(v_max.Y);
 
-    int width = buffer->width;
-    int height = buffer->height;
-
-    int pitch = width*buffer->bpp;
-    u8 *row = (u8 *)buffer->memory;    
-    for(int y = 0; y < height; ++y)
+    if(min_x < 0)
     {
-        u8 *pixel = row;
-        for(int x = 0; x < width; ++x)
-        {
-            *pixel = blue;
-            ++pixel;
-             
-             *pixel = green;
-             ++pixel;
+        min_x = 0;
+    }
 
-            *pixel = red;
-             ++pixel;
+    if(min_y < 0)
+    {
+        min_y = 0;
+    }
 
-            *pixel = 0;
-             ++pixel;
-            }
+    if(max_x > buffer->width)
+    {
+        max_x = buffer->width;
+    }
+
+    if(max_y > buffer->height)
+    {
+        max_y = buffer->height;
+    }
+    /*
+        Pixel in memory: BB GG RR xx
+    */
+
+    u32 color = ((RoundReal32ToUInt32(red * 255.0f) << 16) |
+                 (RoundReal32ToUInt32(green * 255.0f) << 8) |
+                 (RoundReal32ToUInt32(blue * 255.0f) << 0));
+
+    u8 *row = ((u8 *)buffer->memory + min_x*buffer->bpp + min_y*buffer->pitch);
+
+    for(int y = min_y; y < max_y; ++y)
+    {
+        u32 *pixel = (u32 *)row;
+        for(int x = min_x; x < max_x; ++x)
+        {            
+            *pixel++ = color;
         }
-
-        row += pitch;
+        
+        row += buffer->pitch;
+    }
 }
 
-internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, u8 blue, u8 green, u8 red)
+internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, r32 red, r32 green, r32 blue)
 {    
     /*
         Pixel in memory: BB GG RR xx
     */
-    u8 *pixel = (u8 *)buffer->memory;
-    pixel += (y*buffer->width+x)*buffer->bpp;
-    *pixel = blue;
-    ++pixel;
-             
-    *pixel = green;
-    ++pixel;
+    u32 color = ((RoundReal32ToUInt32(red * 255.0f) << 16) |
+                 (RoundReal32ToUInt32(green * 255.0f) << 8) |
+                 (RoundReal32ToUInt32(blue * 255.0f) << 0));
 
-    *pixel = red;
-    ++pixel;
-    
-    *pixel = 0;
-    ++pixel;
+	u8 *row = (u8 *)buffer->memory;
+	row += ((y*buffer->width + x)*buffer->bpp);
+    u32 *pixel = (u32 *)row;
+	*pixel = color;
 }
 
-internal void GameUpdateAndRender(Game_Offscreen_Buffer *buffer, Game_Controller_Input *input, Vec2 dd_player) 
+internal void GameUpdateAndRender(Game_Offscreen_Buffer *buffer, Game_Controller_Input *input, v2 dd_player) 
 {
-	FillScreen(buffer, 255, 0, 0);
+	v2 min = V2(0.0f, 0.0f);
+	v2 max = V2((r32)buffer->width, (r32)buffer->height);
+	DrawRectangle(buffer, min, max, 1.0f, 0.984f, 0.0f);
+
+	DrawPixel(buffer, buffer->width/2, buffer->height/2, 0, 255, 0);
+	DrawPixel(buffer, (buffer->width/2)+1, (buffer->height/2)+1, 0.91f, 0.141f, 0.376f);
+	DrawPixel(buffer, (buffer->width/2)+2, (buffer->height/2)+2, 0.91f, 0.141f, 0.376f);
+	DrawPixel(buffer, (buffer->width/2)+3, (buffer->height/2)+3, 0.91f, 0.141f, 0.376f);
 }
