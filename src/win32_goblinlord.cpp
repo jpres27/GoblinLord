@@ -23,113 +23,20 @@ global_variable u32 GAME_HEIGHT = 180;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
-global_variable BITMAPINFO BitmapInfo;
-global_variable void *BitmapMemory;
-global_variable int BitmapWidth;
-global_variable int BitmapHeight;
-global_variable int BytesPerPixel = 4;
-
 #include "win32_wasapi.h"
 #include "sound.cpp"
 #include "goblinlord.cpp"
 
 global_variable WasapiAudio audio;
 
-internal void FillScreen(u8 blue, u8 green, u8 red)
-{    
-    /*
-        Pixel in memory: BB GG RR xx
-    */
-
-    int Width = BitmapWidth;
-    int Height = BitmapHeight;
-
-    int Pitch = Width*BytesPerPixel;
-    u8 *Row = (u8 *)BitmapMemory;    
-    for(int Y = 0; Y < BitmapHeight; ++Y)
-    {
-        u8 *Pixel = Row;
-        for(int X = 0; X < BitmapWidth; ++X)
-        {
-            *Pixel = blue;
-            ++Pixel;
-             
-             *Pixel = green;
-             ++Pixel;
-
-            *Pixel = red;
-             ++Pixel;
-
-            *Pixel = 0;
-             ++Pixel;
-            }
-        }
-
-        Row += Pitch;
-}
-
-internal void DrawPixel(u32 x, u32 y, u8 blue, u8 green, u8 red)
-{    
-    /*
-        Pixel in memory: BB GG RR xx
-    */
-
-    int Width = BitmapWidth;
-    int Height = BitmapHeight;
- 
-    u8 *Pixel = (u8 *)BitmapMemory;
-    Pixel += (y*Width+x)*BytesPerPixel;
-    *Pixel = blue;
-    ++Pixel;
-             
-    *Pixel = green;
-    ++Pixel;
-
-    *Pixel = red;
-    ++Pixel;
-    
-    *Pixel = 0;
-    ++Pixel;
-}
-
-internal void init_arena(Memory_Arena *arena, memory_index size, u8 *base)
+internal void InitArena(Memory_Arena *arena, memory_index size, u8 *base)
 {
     arena->size = size;
     arena->base = base;
     arena->used = 0;
 }
 
-// NOTE: Based on Raymond Chen's blog about fullscreen toggling
-internal void toggle_fullscreen(HWND window)
-{
-  DWORD style = GetWindowLong(window, GWL_STYLE);
-  if (style & WS_OVERLAPPEDWINDOW) 
-  {
-    MONITORINFO monitor_info = { sizeof(monitor_info) };
-    if (GetWindowPlacement(window, &prev_window_position) &&
-        GetMonitorInfo(MonitorFromWindow(window,
-                       MONITOR_DEFAULTTOPRIMARY), &monitor_info)) 
-    {
-      SetWindowLong(window, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
-      SetWindowPos(window, HWND_TOP,
-                   monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
-                   monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
-                   monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
-                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-    }
-  }
-  else 
-  {
-    SetWindowLong(window, GWL_STYLE,
-                  style | WS_OVERLAPPEDWINDOW);
-    SetWindowPlacement(window, &prev_window_position);
-    SetWindowPos(window, 0, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-  }
-}
-
-internal Win32_Window_Dimensions get_window_dimensions(HWND window)
+internal Win32_Window_Dimensions Win32GetWindowDimensions(HWND window)
 {
     Win32_Window_Dimensions result;
     RECT client_rect;
@@ -140,40 +47,49 @@ internal Win32_Window_Dimensions get_window_dimensions(HWND window)
     return (result);
 }
 
-internal void win32_resize_DIB_section(int Width, int Height)
+internal void Win32ResizeDIBSection(Win32_Buffer *buffer, int width, int height)
 {
-    if(BitmapMemory)
+    if(buffer->memory)
     {
-        VirtualFree(BitmapMemory, 0, MEM_RELEASE);
+        VirtualFree(buffer->memory, 0, MEM_RELEASE);
     }
 
-    BitmapWidth = Width;
-    BitmapHeight = Height;
-    
-    BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader);
-    BitmapInfo.bmiHeader.biWidth = BitmapWidth;
-    BitmapInfo.bmiHeader.biHeight = -BitmapHeight;
-    BitmapInfo.bmiHeader.biPlanes = 1;
-    BitmapInfo.bmiHeader.biBitCount = 32;
-    BitmapInfo.bmiHeader.biCompression = BI_RGB;
+    buffer->width = width;
+    buffer->height = height;
 
-    int BitmapMemorySize = (BitmapWidth*BitmapHeight)*BytesPerPixel;
-    BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    int bpp = 4;
+    buffer->bpp = bpp;
+
+    buffer->info.bmiHeader.biSize = sizeof(buffer->info.bmiHeader);
+    buffer->info.bmiHeader.biWidth = buffer->width;
+    buffer->info.bmiHeader.biHeight = -buffer->height;
+    buffer->info.bmiHeader.biPlanes = 1;
+    buffer->info.bmiHeader.biBitCount = 32;
+    buffer->info.bmiHeader.biCompression = BI_RGB;
+
+    int bitmap_memory_size = (buffer->width*buffer->height)*bpp;
+    buffer->memory = VirtualAlloc(0, bitmap_memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    buffer->pitch = width*bpp;
 }
 
-internal void Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width, int Height)
-{    
-    int WindowWidth = ClientRect->right - ClientRect->left;
-    int WindowHeight = ClientRect->bottom - ClientRect->top;
+internal void Win32DisplayBufferInWindow(Win32_Buffer *Buffer, HDC DeviceContext, int WindowWidth, int WindowHeight)
+{
+    int OffsetX = 10;
+    int OffsetY = 10;
+
+    PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
+    PatBlt(DeviceContext, 0, OffsetY + Buffer->height, WindowWidth, WindowHeight, BLACKNESS);
+    PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+    PatBlt(DeviceContext, OffsetX + Buffer->width, 0, WindowWidth, WindowHeight, BLACKNESS);
+    
+    // NOTE(casey): For prototyping purposes, we're going to always blit
+    // 1-to-1 pixels to make sure we don't introduce artifacts with
+    // stretching while we are learning to code the renderer!
     StretchDIBits(DeviceContext,
-                  /*
-                  X, Y, Width, Height,
-                  X, Y, Width, Height,
-                  */
-                  0, 0, BitmapWidth, BitmapHeight,
-                  0, 0, WindowWidth, WindowHeight,
-                  BitmapMemory,
-                  &BitmapInfo,
+                  OffsetX, OffsetY, Buffer->width, Buffer->height,
+                  0, 0, Buffer->width, Buffer->height,
+                  Buffer->memory,
+                  &Buffer->info,
                   DIB_RGB_COLORS, SRCCOPY);
 }
 
@@ -263,13 +179,6 @@ internal void process_pending_messages(Game_Controller_Input *input)
                     {
                         running = false;
                     }
-                    if((vk_code == VK_RETURN) && (alt_key_down))
-                    {
-                        if(message.hwnd)
-                        {
-                            toggle_fullscreen(message.hwnd);
-                        }
-                    }
                 }
             }
         } break;
@@ -287,16 +196,7 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
     LRESULT result = 0;
     switch( msg )
     {
-        case WM_SIZE:
-        {
-            RECT ClientRect;
-            GetClientRect(window, &ClientRect);
-            int Width = ClientRect.right - ClientRect.left;
-            int Height = ClientRect.bottom - ClientRect.top;
-            win32_resize_DIB_section(Width, Height);
-        } break;
-
-        case WM_DESTROY:
+       case WM_DESTROY:
         {
             // TODO: Handle with error message to user?
             running = false;
@@ -336,15 +236,9 @@ LRESULT CALLBACK win32_main_window_callback(HWND window, UINT msg, WPARAM wParam
         case WM_PAINT:
         {
             PAINTSTRUCT paint;
-            HDC device_context = BeginPaint(window, &paint);
-            int x = paint.rcPaint.left;
-            int y = paint.rcPaint.right;
-            int width = paint.rcPaint.bottom - paint.rcPaint.top;
-            int height = paint.rcPaint.right - paint.rcPaint.left;
-            RECT ClientRect;
-            GetClientRect(window, &ClientRect);
-
-            Win32UpdateWindow(device_context, &ClientRect, x, y, width, height);
+            HDC dc = BeginPaint(window, &paint);
+            Win32_Window_Dimensions d = Win32GetWindowDimensions(window);
+            Win32DisplayBufferInWindow(&global_backbuffer, dc, d.width, d.height);
             EndPaint(window, &paint);
         } break;
 
@@ -403,6 +297,8 @@ int WINAPI WinMain(HINSTANCE instance,
     b32 scheduler_granularity_set = (timeBeginPeriod(desired_scheduler_milliseconds) == TIMERR_NOERROR);
 
     WNDCLASS window_class = {};
+
+    Win32ResizeDIBSection(&global_backbuffer, GAME_WIDTH, GAME_HEIGHT);
 
     window_class.style = CS_HREDRAW | CS_VREDRAW;
     window_class.lpfnWndProc = win32_main_window_callback;
@@ -490,7 +386,7 @@ int WINAPI WinMain(HINSTANCE instance,
                 }
                 process_pending_messages(&new_input);
 
-                vec2 dd_player = {};
+                Vec2 dd_player = {};
                 if(new_input.move_left.ended_down)
                 {
                     dd_player.x = -1.0f;
@@ -570,20 +466,19 @@ int WINAPI WinMain(HINSTANCE instance,
                     WA_UnlockBuffer(&audio, writeCount);
                 }
 
-                // TODO: Game update and render
-                // For now lets just figure out writing something to the global_backbuffer
-                // and we can do more later once that is working
+                Game_Offscreen_Buffer offscreen_buffer = {};
+                offscreen_buffer.memory = global_backbuffer.memory;
+                offscreen_buffer.width = global_backbuffer.width; 
+                offscreen_buffer.height = global_backbuffer.height;
+                offscreen_buffer.pitch = global_backbuffer.pitch;
+                offscreen_buffer.bpp = global_backbuffer.bpp;
 
-                FillScreen(255, 255, 255);
-                DrawPixel(BitmapWidth/2, BitmapHeight/2, 255, 0, 0);
+                GameUpdateAndRender(&offscreen_buffer, &new_input, dd_player);
 
-                HDC DeviceContext = GetDC(window);
-                RECT ClientRect;
-                GetClientRect(window, &ClientRect);
-                int WindowWidth = ClientRect.right - ClientRect.left;
-                int WindowHeight = ClientRect.bottom - ClientRect.top;
-                Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
-                ReleaseDC(window, DeviceContext);
+                Win32_Window_Dimensions d = Win32GetWindowDimensions(window);
+                HDC dc = GetDC(window);
+                Win32DisplayBufferInWindow(&global_backbuffer, dc, d.width, d.height);
+                ReleaseDC(window, dc);
 
                 LARGE_INTEGER work_counter = win32_get_wall_clock();
                 r32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);

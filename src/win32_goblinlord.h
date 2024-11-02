@@ -10,7 +10,7 @@
 struct Win32_Buffer
 {
     // NOTE: Pixels are always 32 bits wide, memory order BB GG RR XX
-    BITMAPINFO Info;
+    BITMAPINFO info;
     void *memory;
     int width;
     int height;

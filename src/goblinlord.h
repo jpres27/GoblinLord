@@ -21,6 +21,8 @@ typedef float r32;
 typedef double r64;
 typedef size_t memory_index;
 
+global_variable r32 PI = 3.141592;
+
 struct Game_Clocks 
 {
     r32 second_elapsed;
@@ -50,7 +52,12 @@ struct Loaded_Bitmap
     uint32_t *pixels;
 };
 
-struct vec2
+struct Vec2
 {
     r32 x, y;
+};
+
+struct Vec3 
+{
+    r32 x, y, z;
 };
