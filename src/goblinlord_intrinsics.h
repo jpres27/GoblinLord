@@ -14,6 +14,12 @@ inline r32 AbsoluteValue(r32 value)
     return(Result);
 }
 
+inline i32 AbsoluteValue(i32 value)
+{
+    i32 Result = abs(value);
+    return(Result);
+}
+
 inline u32 RotateLeft(u32 Value, i32 Amount)
 {
     u32 Result = _rotl(Value, Amount);
