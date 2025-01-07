@@ -14,6 +14,7 @@
 #include "win32_goblinlord.h"
 #include "goblinlord_math.h"
 #include "goblinlord_intrinsics.h"
+#include "obj_loader.h"
 
 global_variable b32 running = false;
 global_variable WINDOWPLACEMENT prev_window_position = {sizeof(prev_window_position)};

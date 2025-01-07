@@ -63,6 +63,9 @@ internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, r32 red, r3
 
 internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i32 y1)
 {
+	// TODO: Horizontal, vertical, and diagonal lines can be special cased, according to Mike Abrash,
+	// as they are much cheaper to do than the general line
+
 	b32 steep = false;
 	if(AbsoluteValue(x0 - x1) < AbsoluteValue(y0 - y1))
 	{
@@ -85,10 +88,14 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 		y1 = temp;
 	}
 
+	i32 delta_x = x1 - x0;
+	i32 delta_y = y1 - y0;
+	i32 delta_error_x2 = AbsoluteValue(delta_y)*2;
+	i32 error_x2 = 0;
+
+	i32 y = y0;
 	for(i32 x = x0; x <= x1; ++x) 
 	{
-		r32 t = (x-x0)/(r32)(x1-x0);
-		i32 y = y0*(1.0f - t) + y1*t;
 		if(steep) 
 		{
 			DrawPixel(buffer, y, x, 1.0f, 0.0f, 0.0f);
@@ -97,15 +104,26 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 		{
 			DrawPixel(buffer, x, y, 1.0f, 0.0f, 0.0f);
 		}
+		error_x2 += delta_error_x2;
+		if(error_x2 > delta_x) 
+		{
+			y += (y1 > y0 ? 1 : -1);
+			error_x2 -= delta_x*2;
+		}
 	}
 }
 
 internal void GameUpdateAndRender(Game_Offscreen_Buffer *buffer, Game_Controller_Input *input, v2 dd_player) 
 {
+	/*
 	v2 min = V2(0.0f, 0.0f);
 	v2 max = V2((r32)buffer->width, (r32)buffer->height);
 	DrawRectangle(buffer, min, max, 1.0f, 0.984f, 0.0f);
 
 	DrawLine(buffer, buffer->width/2, buffer->height/2, buffer->width-1, buffer->height-1);
 	DrawLine(buffer, buffer->width/4, buffer->height/4, buffer->width-20, buffer->height-20);
+	DrawLine(buffer, 40, buffer->height/2, 45, 60);
+	*/
+
+
 }

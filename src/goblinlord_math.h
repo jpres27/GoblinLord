@@ -81,6 +81,91 @@ inline v2 operator-(v2 A, v2 B)
     return(Result);
 }
 
+union v3
+{
+    struct
+    {
+        r32 X, Y, Z;
+    };
+    r32 E[3];
+};
+
+inline v3 V3(r32 X, r32 Y, r32 Z)
+{
+    v3 Result;
+
+    Result.X = X;
+    Result.Y = Y;
+    Result.Z = Z;
+
+    return(Result);
+}
+
+inline v3 operator*(r32 A, v3 B)
+{
+    v3 Result;
+
+    Result.X = A*B.X;
+    Result.Y = A*B.Y;
+    Result.Z = A*B.Z;
+
+    return(Result);
+}
+
+inline v3 operator*(v3 B, r32 A)
+{
+    v3 Result = A*B;
+
+    return(Result);
+}
+
+inline v3 & operator*=(v3 &B, r32 A)
+{
+    B = A * B;
+
+    return(B);
+}
+
+inline v3 operator-(v3 A)
+{
+    v3 Result;
+
+    Result.X = -A.X;
+    Result.Y = -A.Y;
+    Result.Z = -A.Z;
+
+    return(Result);
+}
+
+inline v3 operator+(v3 A, v3 B)
+{
+    v3 Result;
+
+    Result.X = A.X + B.X;
+    Result.Y = A.Y + B.Y;
+    Result.Z = A.Z + B.Z;
+
+    return(Result);
+}
+
+inline v3 & operator+=(v3 &A, v3 B)
+{
+    A = A + B;
+
+    return(A);
+}
+
+inline v3 operator-(v3 A, v3 B)
+{
+    v3 Result;
+
+    Result.X = A.X - B.X;
+    Result.Y = A.Y - B.Y;
+    Result.Z = A.Z - B.Z;
+
+    return(Result);
+}
+
 inline r32 Square(r32 A)
 {
     r32 Result = A*A;
