@@ -14,20 +14,21 @@
 #include "win32_goblinlord.h"
 #include "goblinlord_math.h"
 #include "goblinlord_intrinsics.h"
-#include "obj_loader.h"
+#include "rasterizer.h"
 
 global_variable b32 running = false;
 global_variable WINDOWPLACEMENT prev_window_position = {sizeof(prev_window_position)};
 
 global_variable u32 SCREEN_WIDTH = 1020;
 global_variable u32 SCREEN_HEIGHT = 540;
-global_variable u32 GAME_WIDTH = 960;
+global_variable u32 GAME_WIDTH = 1020;
 global_variable u32 GAME_HEIGHT = 540;
 global_variable Win32_Buffer global_backbuffer;
 global_variable i64 perf_count_freq;
 
 #include "win32_wasapi.h"
 #include "sound.cpp"
+#include "rasterizer.cpp"
 #include "goblinlord.cpp"
 
 global_variable WasapiAudio audio;
