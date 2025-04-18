@@ -8,8 +8,8 @@
 #define AssertHR(hr) assert(SUCCEEDED(hr))
 #define array_count(array) (sizeof(array) / sizeof((array)[0]))
 
-#define min(a, b) ((a < b) ? (a) : (b))
-#define max(a, b) ((a > b) ? (a) : (b))
+#define Min(a, b) ((a < b) ? (a) : (b))
+#define Max(a, b) ((a > b) ? (a) : (b))
 
 typedef int32_t i32;
 typedef int64_t i64;

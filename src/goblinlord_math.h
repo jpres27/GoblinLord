@@ -231,7 +231,17 @@ inline r32 LengthSq(v2 A)
     return(Result);
 }
 
-inline r32 Determinant2D(v4 *v0, v4 *v1)
+inline r32 Determinant2D(v4 v0, v4 v1)
 {
-    return v0->X * v1->Y - v0->Y * v1->X;
+    return(v0.X * v1.Y - v0.Y * v1.X);
+}
+
+inline v4 Vector3DTo4D(v3 *v)
+{
+    return(V4(v->X, v->Y, v->Z, 0.0f));
+}
+
+inline v4 Point3DTo4D(v3 *v)
+{
+    return(V4(v->X, v->Y, v->Z, 1.0f));
 }

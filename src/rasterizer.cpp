@@ -62,7 +62,7 @@ internal void ClearScreen(Game_Offscreen_Buffer *buffer)
 {
 	v2 min = V2(0.0f, 0.0f);
 	v2 max = V2((r32)buffer->width, (r32)buffer->height);
-	DrawRectangle(buffer, min, max, 1.0f, 0.984f, 0.0f);
+	DrawRectangle(buffer, min, max, 1.0f, 1.0f, 1.0f);
 }
 
 internal RGBA8 GetPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y)
@@ -74,14 +74,14 @@ internal RGBA8 GetPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y)
     return(pixel);
 }
 
-internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, r32 red, r32 green, r32 blue)
+internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, RGBAReal32 colorf)
 {    
     /*
         Pixel in memory: BB GG RR xx
     */
-    u32 color = ((RoundReal32ToUInt32(red * 255.0f) << 16) |
-                 (RoundReal32ToUInt32(green * 255.0f) << 8) |
-                 (RoundReal32ToUInt32(blue * 255.0f) << 0));
+    u32 color = ((RoundReal32ToUInt32(colorf.red * 255.0f) << 16) |
+                 (RoundReal32ToUInt32(colorf.green * 255.0f) << 8) |
+                 (RoundReal32ToUInt32(colorf.blue * 255.0f) << 0));
 
 	u8 *row = (u8 *)buffer->memory;
 	row += ((y*buffer->width + x)*buffer->bpp);
@@ -89,7 +89,7 @@ internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, r32 red, r3
 	*pixel = color;
 }
 
-internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i32 y1, r32 r, r32 g, r32 b)
+internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i32 y1, RGBAReal32 colorf)
 {
 	// TODO: Horizontal, vertical, and diagonal lines can be special cased, according to Mike Abrash,
 	// as they are much cheaper to do than the general line
@@ -126,11 +126,11 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 	{
 		if(steep) 
 		{
-			DrawPixel(buffer, y, x, r, g, b);
+			DrawPixel(buffer, y, x, colorf);
 		}
 		else 
 		{
-			DrawPixel(buffer, x, y, r, g, b);
+			DrawPixel(buffer, x, y, colorf);
 		}
 		error_x2 += delta_error_x2;
 		if(error_x2 > delta_x) 
@@ -139,4 +139,64 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 			error_x2 -= delta_x*2;
 		}
 	}
+}
+
+void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command)
+{
+    for (u32 i = 0; i+2 < command->mesh.num_vertices; i += 3)
+    {
+        v4 vert0 = Point3DTo4D(&command->mesh.positions[i+0]);
+        v4 vert1 = Point3DTo4D(&command->mesh.positions[i+1]);
+        v4 vert2 = Point3DTo4D(&command->mesh.positions[i+2]);
+
+		r32 det012 = Determinant2D(vert1 - vert0, vert2 - vert0);
+
+		b32 ccw = det012 < 0.0f;
+
+		switch (command.cull_mode)
+		{
+		case none:
+    		break;
+		case cw:
+    		if(!ccw) continue;
+    		break;
+		case ccw:
+    		if(ccw) continue;
+    		break;
+		}
+
+		if (ccw)
+		{
+			v4 temp;
+			temp = vert1;
+			vert1 = vert2;
+			vert2 = temp;
+    		det012 = -det012;
+		}
+
+		i32 x_min = Min(FloorReal32ToInt32(vert0.X), Min(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X)));
+		i32 x_max = Max(FloorReal32ToInt32(vert0.X), Max(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X)));
+		i32 y_min = Min(FloorReal32ToInt32(vert0.Y), Min(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y)));
+		i32 y_max = Max(FloorReal32ToInt32(vert0.Y), Max(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y)));
+
+		x_min = Max(0, x_min);
+		x_max = Min(buffer->width - 1, x_max);
+		y_min = Max(0, y_min);
+		y_max = Min(buffer->height - 1, y_max);
+
+        for (i32 y = y_min; y <= y_max; ++y)
+        {
+            for (i32 x = x_min; x <= x_max; ++x)
+            {
+                v4 p = V4(x + 0.5f, y + 0.5f, 0.f, 0.f);
+
+                r32 det01p = Determinant2D(vert1-vert0, p-vert0);
+                r32 det12p = Determinant2D(vert2-vert1, p-vert1);
+                r32 det20p = Determinant2D(vert0-vert2, p-vert2);
+
+                if (det01p >= 0.f && det12p >= 0.f && det20p >= 0.f)
+                    DrawPixel(buffer, x, y, command->mesh.colorf);
+            }
+        }
+    }
 }
