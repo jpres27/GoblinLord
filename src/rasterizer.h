@@ -28,4 +28,5 @@ struct DrawCommand
 {
     Mesh mesh;
     CullMode cull_mode;
+    m4x4 transform;
 };

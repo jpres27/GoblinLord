@@ -141,26 +141,26 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 	}
 }
 
-void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command)
+void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_Input *input)
 {
     for (u32 i = 0; i+2 < command->mesh.num_vertices; i += 3)
     {
-        v4 vert0 = Point3DTo4D(&command->mesh.positions[i+0]);
-        v4 vert1 = Point3DTo4D(&command->mesh.positions[i+1]);
-        v4 vert2 = Point3DTo4D(&command->mesh.positions[i+2]);
+        v4 vert0 = command->transform * Point3DTo4D(command->mesh.positions[i+0]);
+        v4 vert1 = command->transform * Point3DTo4D(command->mesh.positions[i+1]);
+        v4 vert2 = command->transform * Point3DTo4D(command->mesh.positions[i+2]);
 
 		r32 det012 = Determinant2D(vert1 - vert0, vert2 - vert0);
 
 		b32 ccw = det012 < 0.0f;
 
-		switch (command.cull_mode)
+		switch (command->cull_mode)
 		{
-		case none:
+		case CullMode::none:
     		break;
-		case cw:
+		case CullMode::cw:
     		if(!ccw) continue;
     		break;
-		case ccw:
+		case CullMode::ccw:
     		if(ccw) continue;
     		break;
 		}

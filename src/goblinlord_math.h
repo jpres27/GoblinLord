@@ -231,17 +231,46 @@ inline r32 LengthSq(v2 A)
     return(Result);
 }
 
-inline r32 Determinant2D(v4 v0, v4 v1)
+inline r32 Determinant2D(const v4& v0, const v4& v1)
 {
     return(v0.X * v1.Y - v0.Y * v1.X);
 }
 
-inline v4 Vector3DTo4D(v3 *v)
+inline v4 Vector3DTo4D(const v3& v)
 {
-    return(V4(v->X, v->Y, v->Z, 0.0f));
+    return(V4(v.X, v.Y, v.Z, 0.0f));
 }
 
-inline v4 Point3DTo4D(v3 *v)
+inline v4 Point3DTo4D(const v3& v)
 {
-    return(V4(v->X, v->Y, v->Z, 1.0f));
+    return(V4(v.X, v.Y, v.Z, 1.0f));
+}
+
+struct m4x4
+{
+    r32 values[16];
+};
+
+inline v4 operator*(const m4x4& m, const v4& v)
+{
+    v4 result = V4(0.f, 0.f, 0.f, 0.f);
+
+    result.X = m.values[ 0] * v.X + m.values[ 1] * v.Y + m.values[ 2] * v.Z + m.values[ 3] * v.W;
+    result.Y = m.values[ 4] * v.X + m.values[ 5] * v.Y + m.values[ 6] * v.Z + m.values[ 7] * v.W;
+    result.Z = m.values[ 8] * v.X + m.values[ 9] * v.Y + m.values[10] * v.Z + m.values[11] * v.W;
+    result.W = m.values[12] * v.X + m.values[13] * v.Y + m.values[14] * v.Z + m.values[15] * v.W;
+
+    return result;
+}
+
+internal m4x4 IdentityMatrix()
+{
+    m4x4 m = { {
+        1.f, 0.f, 0.f, 0.f,
+        0.f, 1.f, 0.f, 0.f,
+        0.f, 0.f, 1.f, 0.f,
+        0.f, 0.f, 0.f, 1.f,
+    } };
+    
+    return(m);
 }
