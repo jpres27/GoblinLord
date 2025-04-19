@@ -171,7 +171,7 @@ union v4
     {
         r32 X, Y, Z, W;
     };
-    r32 E[2];
+    r32 E[4];
 };
 
 inline v4 V4(r32 X, r32 Y, r32 Z, r32 W)
@@ -184,6 +184,15 @@ inline v4 V4(r32 X, r32 Y, r32 Z, r32 W)
     Result.W = W;
 
     return(Result);
+}
+
+inline v4 operator+(const v4& A, const v4& B)
+{
+    v4 Result;
+    Result.X = A.X + B.X; 
+    Result.Y = A.Y + B.Y; 
+    Result.Z = A.Z + B.Z;
+    Result.W = A.W + B.W;
 }
 
 inline v4 operator-(v4 A, v4 B)
@@ -206,6 +215,84 @@ inline v4 operator-(v4 A)
     Result.Y = -A.Y;
     Result.Z = -A.Z;
     Result.W = -A.W;
+
+    return(Result);
+}
+
+inline v4 operator*(r32 A, v4 B)
+{
+    v4 Result;
+
+    Result.X = A*B.X;
+    Result.Y = A*B.Y;
+    Result.Z = A*B.Z;
+    Result.W = A*B.W;
+
+    return(Result);
+}
+
+inline v4 operator*(v4 B, r32 A)
+{
+    v4 Result = A*B;
+
+    return(Result);
+}
+
+inline v4 & operator*=(v4 &B, r32 A)
+{
+    B = A * B;
+
+    return(B);
+}
+
+union RGBA32
+{
+    struct 
+    {
+        r32 red, green, blue, alpha;
+    };
+    r32 E[4];
+};
+
+inline RGBA32 CreateRGBA32(r32 red, r32 green, r32 blue, r32 alpha)
+{
+    RGBA32 Result;
+
+    Result.red = red;
+    Result.green = green;
+    Result.blue = blue;
+    Result.alpha = alpha;
+
+    return(Result);
+}
+
+inline RGBA32 operator+(const RGBA32& A, const RGBA32& B)
+{
+    RGBA32 Result;
+    
+    Result.red = A.red + B.red; 
+    Result.green = A.green + B.green; 
+    Result.blue = A.blue + B.blue;
+    Result.alpha = A.alpha + B.alpha;
+
+    return(Result);
+}
+
+inline RGBA32 operator*(r32 A, const RGBA32& B)
+{
+    RGBA32 Result;
+
+    Result.red = A*B.red;
+    Result.green = A*B.green;
+    Result.blue = A*B.blue;
+    Result.alpha = A*B.alpha;
+
+    return(Result);
+}
+
+inline RGBA32 operator*(RGBA32 B, r32 A)
+{
+    RGBA32 Result = A*B;
 
     return(Result);
 }
@@ -271,6 +358,6 @@ internal m4x4 IdentityMatrix()
         0.f, 0.f, 1.f, 0.f,
         0.f, 0.f, 0.f, 1.f,
     } };
-    
+
     return(m);
 }

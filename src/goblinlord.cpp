@@ -9,18 +9,19 @@ internal void GameUpdateAndRender(Game_Offscreen_Buffer *buffer, Game_Controller
 		V3(0.0f, 100.0f, 0.0f)
 	};
 
+	RGBA32 colors[] =
+	{
+    	CreateRGBA32(1.0f, 0.0f, 0.0f, 1.0f),
+    	CreateRGBA32(0.0f, 1.0f, 0.0f, 1.0f),
+    	CreateRGBA32(0.0f, 0.0f, 1.0f, 1.0f)
+	};
+
 	for(i32 i = 0; i < 100; ++i)
 	{
-		RGBAReal32 test_color = {};
-		test_color.red = (i%3) == 0;
-		test_color.green = (i%3) == 1;
-		test_color.blue = (i%3) == 2;
-		test_color.alpha = 1.0f;
-
 		Mesh test_mesh = {};
-		test_mesh.positions = vertices;
+		test_mesh.vertices = vertices;
 		test_mesh.num_vertices = 3;
-		test_mesh.colorf = test_color;
+		test_mesh.colors = colors;
 
 		DrawCommand command = {};
 		command.mesh = test_mesh;

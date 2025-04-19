@@ -5,11 +5,6 @@ struct RGBA8
     u8 r, g, b, a;
 };
 
-struct RGBAReal32
-{
-    r32 red, green, blue, alpha;
-};
-
 enum CullMode
 {
     none,
@@ -19,9 +14,9 @@ enum CullMode
 
 struct Mesh
 {
-    v3 *positions;
+    v3 *vertices;
     u32 num_vertices;
-    RGBAReal32 colorf; 
+    RGBA32 *colors;
 };
 
 struct DrawCommand

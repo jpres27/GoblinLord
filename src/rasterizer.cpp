@@ -74,7 +74,7 @@ internal RGBA8 GetPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y)
     return(pixel);
 }
 
-internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, RGBAReal32 colorf)
+internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, RGBA32 colorf)
 {    
     /*
         Pixel in memory: BB GG RR xx
@@ -89,7 +89,7 @@ internal void DrawPixel(Game_Offscreen_Buffer *buffer, u32 x, u32 y, RGBAReal32 
 	*pixel = color;
 }
 
-internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i32 y1, RGBAReal32 colorf)
+internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i32 y1, RGBA32 colorf)
 {
 	// TODO: Horizontal, vertical, and diagonal lines can be special cased, according to Mike Abrash,
 	// as they are much cheaper to do than the general line
@@ -145,9 +145,13 @@ void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_I
 {
     for (u32 i = 0; i+2 < command->mesh.num_vertices; i += 3)
     {
-        v4 vert0 = command->transform * Point3DTo4D(command->mesh.positions[i+0]);
-        v4 vert1 = command->transform * Point3DTo4D(command->mesh.positions[i+1]);
-        v4 vert2 = command->transform * Point3DTo4D(command->mesh.positions[i+2]);
+        v4 vert0 = command->transform * Point3DTo4D(command->mesh.vertices[i+0]);
+        v4 vert1 = command->transform * Point3DTo4D(command->mesh.vertices[i+1]);
+        v4 vert2 = command->transform * Point3DTo4D(command->mesh.vertices[i+2]);
+
+		RGBA32 color0 = command->mesh.colors[i+0];
+        RGBA32 color1 = command->mesh.colors[i+1];
+        RGBA32 color2 = command->mesh.colors[i+2];
 
 		r32 det012 = Determinant2D(vert1 - vert0, vert2 - vert0);
 
@@ -155,14 +159,14 @@ void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_I
 
 		switch (command->cull_mode)
 		{
-		case CullMode::none:
-    		break;
-		case CullMode::cw:
-    		if(!ccw) continue;
-    		break;
-		case CullMode::ccw:
-    		if(ccw) continue;
-    		break;
+			case CullMode::none:
+				break;
+			case CullMode::cw:
+				if(!ccw) continue;
+				break;
+			case CullMode::ccw:
+				if(ccw) continue;
+				break;
 		}
 
 		if (ccw)
@@ -194,8 +198,14 @@ void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_I
                 r32 det12p = Determinant2D(vert2-vert1, p-vert1);
                 r32 det20p = Determinant2D(vert0-vert2, p-vert2);
 
-                if (det01p >= 0.f && det12p >= 0.f && det20p >= 0.f)
-                    DrawPixel(buffer, x, y, command->mesh.colorf);
+                if (det01p >= 0.0f && det12p >= 0.0f && det20p >= 0.0f)
+				{
+    				r32 l0 = det12p / det012;
+    				r32 l1 = det20p / det012;
+    				r32 l2 = det01p / det012;
+
+					DrawPixel(buffer, x, y, (l0 * color0 + l1 * color1 + l2 * color2));
+				}
             }
         }
     }
