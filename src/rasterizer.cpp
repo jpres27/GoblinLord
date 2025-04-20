@@ -10,6 +10,14 @@ internal RGBA8 to_rgba8(v4 *color)
 	return result;
 }
 
+// x_max and y_max are exclusive
+inline v4 NDCToScreen(Viewport *viewport, v4 v)
+{
+	v.X = viewport->x_min + ((viewport->x_max - viewport->x_min) * (0.5f + (0.5f * v.X)));
+	v.Y = viewport->y_min + ((viewport->y_max - viewport->y_min) * (0.5f - (0.5f * v.Y)));
+	return v;
+}
+
 internal void DrawRectangle(Game_Offscreen_Buffer *buffer, v2 v_min, v2 v_max, r32 red, r32 green, r32 blue)
 {        
 	i32 min_x = RoundReal32ToInt32(v_min.X);
@@ -141,13 +149,17 @@ internal void DrawLine(Game_Offscreen_Buffer *buffer, i32 x0, i32 y0, i32 x1, i3
 	}
 }
 
-void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_Input *input)
+void Draw(Game_Offscreen_Buffer *buffer, Viewport *viewport, DrawCommand *command, Game_Controller_Input *input)
 {
     for (u32 i = 0; i+2 < command->mesh.num_vertices; i += 3)
     {
         v4 vert0 = command->transform * Point3DTo4D(command->mesh.vertices[i+0]);
         v4 vert1 = command->transform * Point3DTo4D(command->mesh.vertices[i+1]);
         v4 vert2 = command->transform * Point3DTo4D(command->mesh.vertices[i+2]);
+
+		vert0 = NDCToScreen(viewport, vert0);
+		vert1 = NDCToScreen(viewport, vert1);
+		vert2 = NDCToScreen(viewport, vert2);
 
 		RGBA32 color0 = command->mesh.colors[i+0];
         RGBA32 color1 = command->mesh.colors[i+1];
@@ -178,10 +190,15 @@ void Draw(Game_Offscreen_Buffer *buffer, DrawCommand *command, Game_Controller_I
     		det012 = -det012;
 		}
 
-		i32 x_min = Min(FloorReal32ToInt32(vert0.X), Min(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X)));
-		i32 x_max = Max(FloorReal32ToInt32(vert0.X), Max(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X)));
-		i32 y_min = Min(FloorReal32ToInt32(vert0.Y), Min(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y)));
-		i32 y_max = Max(FloorReal32ToInt32(vert0.Y), Max(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y)));
+		i32 x_min = Max(viewport->x_min, 0);
+		i32 x_max = Min(viewport->x_max, buffer->width) - 1;
+		i32 y_min = Max(viewport->y_min, 0);
+		i32 y_max = Min(viewport->y_max, buffer->height) - 1;
+
+		x_min = Max(x_min, Min(FloorReal32ToInt32(vert0.X), Min(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X))));
+		x_max = Min(x_max, Max(FloorReal32ToInt32(vert0.X), Max(FloorReal32ToInt32(vert1.X), FloorReal32ToInt32(vert2.X))));
+		y_min = Max(y_min, Min(FloorReal32ToInt32(vert0.Y), Min(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y))));
+		y_max = Min(y_max, Max(FloorReal32ToInt32(vert0.Y), Max(FloorReal32ToInt32(vert1.Y), FloorReal32ToInt32(vert2.Y))));
 
 		x_min = Max(0, x_min);
 		x_max = Min(buffer->width - 1, x_max);

@@ -12,6 +12,11 @@ enum CullMode
     ccw
 };
 
+struct Viewport
+{
+ i32 x_min, x_max, y_min, y_max;
+};
+
 struct Mesh
 {
     v3 *vertices;
